@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Капибара и Светлячки</title>
+  <style>
+    :root { --panel: rgba(18, 24, 32, 0.72); --accent: #ffd56a; --accent2: #8ef0c1; --text: #f6f1e7; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020; font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif; color: var(--text); }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #hud { position: fixed; inset: 0; pointer-events: none; }
+    .panel { background: var(--panel); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    #stats { position: absolute; top: 16px; left: 16px; padding: 10px 16px; display: flex; gap: 18px; font-size: 20px; font-weight: 700; }
+    #stats span { display: inline-flex; align-items: center; gap: 6px; }
+    #stats .pulse { animation: pulse 0.35s ease; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
+    #quest { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 18px; text-align: center; min-width: 260px; }
+    #quest .npc { font-size: 13px; opacity: 0.8; letter-spacing: 0.5px; text-transform: uppercase; }
+    #quest .slots { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
+    #quest .slot { width: 44px; height: 50px; border-radius: 10px; border: 2px dashed rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--accent); transition: all 0.25s ease; }
+    #quest .slot.filled { border-style: solid; border-color: var(--accent); background: rgba(255, 213, 106, 0.15); box-shadow: 0 0 14px rgba(255,213,106,0.35); }
+    #quest .slot.next { border-color: var(--accent2); box-shadow: 0 0 12px rgba(142,240,193,0.45); animation: glow 1.2s ease-in-out infinite; }
+    @keyframes glow { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    #quest .hint { font-size: 13px; margin-top: 6px; opacity: 0.85; }
+    #prompt { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); padding: 8px 16px; font-size: 16px; font-weight: 700; opacity: 0; transition: opacity 0.2s; }
+    #prompt.show, #prompt2.show { opacity: 1; }
+    #prompt2 { position: absolute; bottom: 120px; left: 75%; transform: translateX(-50%); padding: 8px 16px; font-size: 16px; font-weight: 700; opacity: 0; transition: opacity 0.2s; }
+    body.split #prompt { left: 25%; }
+    body.split #quest { top: 16px; }
+    #split-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.35); display: none; }
+    body.split #split-line { display: block; }
+    #prompt kbd, #prompt2 kbd, .help kbd, .dialog kbd { background: #fff; color: #222; border-radius: 6px; padding: 1px 7px; font-family: inherit; font-weight: 800; margin: 0 2px; box-shadow: 0 2px 0 #999; }
+    #toasts { position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .toast { padding: 8px 16px; font-size: 15px; font-weight: 700; animation: toastIn 0.3s ease, toastOut 0.4s ease 3.2s forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateY(-8px); } }
+    #minimap { position: absolute; right: 16px; bottom: 16px; width: 200px; height: 200px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+    #minimap canvas { width: 100%; height: 100%; }
+    #abilities { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+    #st-level .xp { display: inline-block; width: 46px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; vertical-align: middle; margin-left: 6px; overflow: hidden; }
+    #st-level .xp b { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #ffb347); transition: width 0.3s ease; }
+    #timer { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); padding: 8px 18px; font-size: 20px; font-weight: 900; color: var(--accent2); letter-spacing: 0.5px; }
+    .card.locked { opacity: 0.55; filter: grayscale(0.6); }
+    .words { display: flex; flex-wrap: wrap; gap: 8px; }
+    .word { background: rgba(255, 213, 106, 0.15); border: 1px solid rgba(255,213,106,0.4); border-radius: 10px; padding: 6px 12px; font-weight: 900; letter-spacing: 2px; color: var(--accent); }
+    .word i { font-style: normal; opacity: 0.6; margin-left: 6px; font-size: 12px; letter-spacing: 0; }
+    .word.locked { opacity: 0.35; color: var(--text); border-style: dashed; }
+    .card .xp { display: block; height: 6px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+    .card .xp b { display: block; height: 100%; background: var(--accent2); }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+    .stat { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; }
+    .stat b { color: var(--accent); }
+    .ability { padding: 8px 12px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .ability .bar { width: 120px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
+    .ability .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #8ef0c1, #7bdff2, #c589e8); width: 100%; transition: width 0.1s linear; }
+    .ability.off { opacity: 0.55; }
+    .help { position: absolute; left: 16px; top: 72px; padding: 12px 16px; font-size: 13px; line-height: 1.7; max-width: 330px; }
+    .help h4 { margin: 0 0 4px; font-size: 14px; color: var(--accent); }
+    #story { position: absolute; left: 16px; bottom: 16px; padding: 10px 14px; max-width: 320px; font-size: 13px; pointer-events: auto; cursor: pointer; transition: opacity 0.4s; }
+    #story .title { font-weight: 900; color: var(--accent); font-size: 13px; letter-spacing: 0.3px; margin-bottom: 4px; }
+    #story .step { opacity: 0.92; line-height: 1.5; }
+    #story .step.done { opacity: 0.5; text-decoration: line-through; }
+    #story .step b { color: var(--accent2); margin-left: 4px; }
+    #story .hint { opacity: 0.55; font-size: 11px; margin-top: 4px; }
+    .step-row { display: flex; flex-wrap: wrap; justify-content: space-between; font-size: 14px; margin-top: 6px; }
+    .step-row > b { color: var(--accent2); }
+    .step-row .xp { width: 100%; }
+    .step-row.done { opacity: 0.55; }
+    .skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+    .branch { background: rgba(255,255,255,0.04); border-radius: 14px; padding: 10px; }
+    .branch h3 { margin: 0 0 2px; font-size: 16px; }
+    .branch .card { margin-top: 8px; }
+    .dialog { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); width: min(720px, 90vw); padding: 18px 22px; pointer-events: auto; display: none; }
+    .dialog.show { display: block; animation: toastIn 0.25s ease; }
+    .dialog .name { color: var(--accent); font-weight: 900; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; }
+    .dialog .text { font-size: 18px; margin-top: 6px; line-height: 1.45; }
+    .dialog .word { font-size: 34px; font-weight: 900; letter-spacing: 8px; color: var(--accent2); margin: 8px 0; text-align: center; text-shadow: 0 0 18px rgba(142,240,193,0.6); }
+    .dialog .ok { margin-top: 10px; font-size: 13px; opacity: 0.8; text-align: right; }
+    .modal { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: auto; background: rgba(5, 8, 14, 0.45); }
+    .modal.show { display: flex; }
+    .modal .box { width: min(820px, 92vw); max-height: 86vh; overflow: auto; padding: 22px 26px; }
+    .modal h2 { margin: 0 0 4px; font-size: 26px; }
+    .modal .sub { opacity: 0.75; margin-bottom: 14px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .tabs button, .btn { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 14px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: inherit; }
+    .tabs button.active, .btn.primary { background: var(--accent); color: #221a05; border-color: transparent; }
+    .btn:disabled { opacity: 0.45; cursor: default; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+    .card { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(255,255,255,0.08); }
+    .card.equipped { border-color: var(--accent2); box-shadow: 0 0 14px rgba(142,240,193,0.3); }
+    .card .icon { font-size: 34px; text-align: center; }
+    .card .title { font-weight: 800; }
+    .card .price { opacity: 0.8; font-size: 13px; }
+    .close { float: right; }
+    #letterbox .bar { position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 0.8s ease; }
+    #letterbox .top { top: 0; } #letterbox .bottom { bottom: 0; }
+    #letterbox.show .bar { height: 11vh; }
+    #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 1s ease; z-index: 9; }
+    #fade.show { opacity: 1; }
+    #cine-text { position: absolute; left: 0; right: 0; bottom: 14vh; text-align: center; font-size: 42px; font-weight: 900; letter-spacing: 6px; color: var(--accent); text-shadow: 0 4px 30px rgba(0,0,0,0.7), 0 0 30px rgba(255,213,106,0.6); opacity: 0; transition: opacity 0.6s; }
+    #cine-text.show { opacity: 1; }
+    #title { position: fixed; inset: 0; background: #06101a url('textures/title.jpg') center/cover no-repeat; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 8vh; pointer-events: auto; z-index: 10; transition: opacity 1.2s ease; }
+    #title::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,16,26,0.1), rgba(6,16,26,0.75)); }
+    #title h1 { position: relative; font-size: clamp(36px, 7vw, 84px); margin: 0; letter-spacing: 4px; color: #fff3c4; text-shadow: 0 6px 40px rgba(0,0,0,0.8), 0 0 40px rgba(255,213,106,0.5); font-weight: 900; }
+    #title p { position: relative; font-size: 18px; opacity: 0.9; margin: 8px 0 22px; max-width: 640px; text-align: center; }
+    #title button { position: relative; font-size: 24px; padding: 14px 44px; border-radius: 40px; border: none; background: var(--accent); color: #2b1f05; font-weight: 900; cursor: pointer; box-shadow: 0 10px 40px rgba(255,213,106,0.45); font-family: inherit; transition: transform 0.15s; }
+    #title button:hover { transform: scale(1.05); }
+    #title.hide { opacity: 0; pointer-events: none; }
+    #pad-badge { position: relative; margin-top: 14px; font-size: 14px; padding: 6px 14px; border-radius: 20px; background: rgba(6,16,26,0.55); color: #cfd8e3; opacity: 0.85; transition: background 0.3s, color 0.3s; }
+    #pad-badge.on { background: rgba(80,200,120,0.25); color: #d8ffe4; }
+    #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.45) 100%); }
+    .hidden { display: none !important; }
+  </style>
+  <script type="module" crossorigin src="./assets/index-BXIbHNXa.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="vignette"></div>
+  <div id="fade"></div>
+  <div id="hud">
+    <div id="stats" class="panel"><span id="st-fire">✨ 0</span><span id="st-gear">⚙️ 0</span><span id="st-time" title="Время идёт в 10 раз быстрее">🕒 --:--</span><span id="st-season">☀️</span><span id="st-mute" title="Звук (M)">🔊</span><span id="st-tasks" title="Задания дня (J)">📋 0/3</span><span id="st-level" title="Уровень (J — журнал)"><span>⭐ 1</span><i class="xp"><b style="width:0%"></b></i></span></div>
+    <div id="timer" class="panel hidden"></div>
+    <div id="quest" class="panel hidden"><div class="npc"></div><div class="slots"></div><div class="hint"></div></div>
+    <div id="abilities"></div>
+    <div id="prompt" class="panel"></div>
+    <div id="prompt2" class="panel"></div>
+    <div id="split-line"></div>
+    <div id="toasts"></div>
+    <div id="minimap"><canvas width="200" height="200"></canvas></div>
+    <div id="help" class="panel help"></div>
+    <div id="story" class="panel hidden"></div>
+    <div id="dialog" class="panel dialog"></div>
+    <div id="modal" class="modal"><div class="box panel"></div></div>
+    <div id="letterbox"><div class="bar top"></div><div class="bar bottom"></div></div>
+    <div id="cine-text"></div>
+  </div>
+  <div id="title">
+    <h1>Капибара и Светлячки</h1>
+    <p>Собирай светлячков, разгадывай головоломки и складывай слова для зверей в смешных костюмах.</p>
+    <button id="play">Играть</button>
+    <div id="pad-badge">🎮 Геймпад не найден: нажми любую кнопку на нём</div>
+  </div>
+</body>
+</html>
